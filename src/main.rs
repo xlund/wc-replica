@@ -1,39 +1,60 @@
 use std::{fs::File, io::Read, path::Path};
 
 use clap::Parser;
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, value_name = "path", help = "Print the byte count")]
-    count: Option<std::path::PathBuf>,
-    #[arg(short, long, value_name = "path", help = "Print the line count")]
-    lines: Option<std::path::PathBuf>,
+    file: std::path::PathBuf,
+    #[arg(short, long, help = "Print byte count")]
+    count: bool,
+    #[arg(short, long, help = "Print line count")]
+    lines: bool,
+    #[arg(short, long, help = "Print word count")]
+    words: bool,
+    #[arg(short = 'm', long, help = "Print character count")]
+    chars: bool,
 }
 fn main() {
     let args = Args::parse();
-    if let Some(c) = args.count {
-        let count = read_bytes(&c).unwrap();
-        println!("{} bytes", count);
-    }
-    if let Some(l) = args.lines {
-        let lines = count_lines(&l).unwrap();
-        println!("{} lines", lines);
+    let file = File::open(&args.file);
+    match file {
+        Ok(file) => run(args, file),
+        Err(e) => println!("Error: {}", e),
     }
 }
 
-fn read_bytes(path: &Path) -> std::io::Result<usize> {
-    let mut file = File::open(path)?;
-    let mut buffer = Vec::new();
-    let sum: usize = file.read_to_end(&mut buffer).iter().sum();
-
-    Ok(sum)
-}
-
-fn count_lines(path: &Path) -> std::io::Result<usize> {
-    let mut file = File::open(path)?;
+fn read_file(mut file: File) -> String {
     let mut buffer = String::new();
-    file.read_to_string(&mut buffer)?;
-    let lines: Vec<String> = buffer.lines().map(|s| s.to_string()).collect();
+    let _ = file.read_to_string(&mut buffer);
+    buffer
+}
 
-    Ok(lines.len())
+fn run(args: Args, file: File) -> () {
+    let path = &args.file;
+    let file = read_file(file);
+    match file.is_empty() {
+        true => println!("{} is empty", path.display()),
+        false => print_counts(&args, path, file),
+    }
+}
+
+fn print_counts(args: &Args, path: &Path, file: String) {
+    let mut counts = String::new();
+    if args.count {
+        let count = format!("{}\t", file.bytes().count());
+        counts.push_str(&count);
+    }
+    if args.lines {
+        let count = format!("{}\t", file.lines().count());
+        counts.push_str(&count);
+    }
+    if args.words {
+        let count = format!("{}\t", file.split_whitespace().count());
+        counts.push_str(&count)
+    }
+    if args.chars {
+        let count = format!("{}\t", file.chars().count());
+        counts.push_str(&count);
+    }
+    println!("{} {}", counts, path.display());
 }
