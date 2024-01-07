@@ -6,18 +6,18 @@ use std::{
 };
 
 use clap::{command, Parser};
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(short, help = "Print byte count", group = "count")]
-    c_byte: bool,
+    pub c_byte: bool,
     #[arg(short, help = "Print line count", group = "count")]
-    l_line: bool,
+    pub l_line: bool,
     #[arg(short, help = "Print word count", group = "count")]
-    w_word: bool,
+    pub w_word: bool,
     #[arg(short, help = "Print character count", group = "count")]
-    m_char: bool,
+    pub m_char: bool,
 }
 pub struct Counter {
     file_name: Option<String>,
@@ -56,7 +56,7 @@ pub enum Count {
 
 impl Count {
     pub fn from_args(args: &Args) -> Result<Count, io::Error> {
-        let buffer = Self::args_to_buffer(args)?;
+        let buffer = Self::buffer_from_args(args)?;
         match args {
             Args { c_byte: true, .. } => Ok(Count::Byte(buffer.len())),
             Args { l_line: true, .. } => Ok(Count::Line(buffer.lines().count())),
@@ -70,7 +70,7 @@ impl Count {
             }),
         }
     }
-    fn args_to_buffer(args: &Args) -> Result<String, io::Error> {
+    fn buffer_from_args(args: &Args) -> Result<String, io::Error> {
         let mut reader: Box<dyn BufRead> = match &args.file {
             Some(path) => Box::new(io::BufReader::new(File::open(path)?)),
             None => Box::new(io::BufReader::new(io::stdin())),
@@ -90,6 +90,20 @@ impl Display for Count {
             Count::Unspecified(line, word, byte) => {
                 write!(f, "{} {} {}", line, word, byte)
             }
+        }
+    }
+}
+impl PartialEq for Count {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Count::Byte(a), Count::Byte(b)) => a == b,
+            (Count::Line(a), Count::Line(b)) => a == b,
+            (Count::Word(a), Count::Word(b)) => a == b,
+            (Count::Char(a), Count::Char(b)) => a == b,
+            (Count::Unspecified(a, b, c), Count::Unspecified(d, e, f)) => {
+                a == d && b == e && c == f
+            }
+            _ => false,
         }
     }
 }
