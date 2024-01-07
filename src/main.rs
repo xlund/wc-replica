@@ -1,60 +1,79 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{
+    fs::File,
+    io::{self, Read},
+};
 
 use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+
 struct Args {
     file: std::path::PathBuf,
-    #[arg(short, long, help = "Print byte count")]
-    count: bool,
-    #[arg(short, long, help = "Print line count")]
-    lines: bool,
-    #[arg(short, long, help = "Print word count")]
-    words: bool,
-    #[arg(short = 'm', long, help = "Print character count")]
-    chars: bool,
+    #[arg(short, help = "Print byte count", group = "count")]
+    c_byte: bool,
+    #[arg(short, help = "Print line count", group = "count")]
+    l_line: bool,
+    #[arg(short, help = "Print word count", group = "count")]
+    w_word: bool,
+    #[arg(short, help = "Print character count", group = "count")]
+    m_char: bool,
 }
+
+enum Target {
+    Byte,
+    Line,
+    Word,
+    Char,
+    None,
+}
+impl Target {
+    pub fn new(args: &Args) -> Target {
+        if args.c_byte {
+            Target::Byte
+        } else if args.l_line {
+            Target::Line
+        } else if args.w_word {
+            Target::Word
+        } else if args.m_char {
+            Target::Char
+        } else {
+            Target::None
+        }
+    }
+    pub fn from_buffer(&self, buffer: String) -> String {
+        match self {
+            Target::Byte => buffer.len().to_string(),
+            Target::Line => buffer.lines().count().to_string(),
+            Target::Word => buffer.split_whitespace().count().to_string(),
+            Target::Char => buffer.chars().count().to_string(),
+            Target::None => {
+                let lines = buffer.lines().count();
+                let words = buffer.split_whitespace().count();
+                let bytes = buffer.len().to_string();
+                format!("{} {} {}", lines, words, bytes)
+            }
+        }
+    }
+}
+
 fn main() {
     let args = Args::parse();
-    let file = File::open(&args.file);
-    match file {
-        Ok(file) => run(args, file),
-        Err(e) => println!("Error: {}", e),
-    }
-}
-
-fn read_file(mut file: File) -> String {
-    let mut buffer = String::new();
-    let _ = file.read_to_string(&mut buffer);
-    buffer
-}
-
-fn run(args: Args, file: File) -> () {
     let path = &args.file;
-    let file = read_file(file);
-    match file.is_empty() {
-        true => println!("{} is empty", path.display()),
-        false => print_counts(&args, path, file),
-    }
+    let file = File::open(path).expect("Unable to open file");
+    let _ = run(args, file);
 }
 
-fn print_counts(args: &Args, path: &Path, file: String) {
-    let mut counts = String::new();
-    if args.count {
-        let count = format!("{}\t", file.bytes().count());
-        counts.push_str(&count);
-    }
-    if args.lines {
-        let count = format!("{}\t", file.lines().count());
-        counts.push_str(&count);
-    }
-    if args.words {
-        let count = format!("{}\t", file.split_whitespace().count());
-        counts.push_str(&count)
-    }
-    if args.chars {
-        let count = format!("{}\t", file.chars().count());
-        counts.push_str(&count);
-    }
-    println!("{} {}", counts, path.display());
+fn read_file(mut file: File) -> Result<String, io::Error> {
+    let mut buffer = String::new();
+    let _ = file.read_to_string(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn run(args: Args, file: File) -> Result<(), io::Error> {
+    let target = Target::new(&args);
+    let buffer = read_file(file)?;
+    let path = &args.file.display();
+    let count = target.from_buffer(buffer);
+    println!("{} {}", count, path);
+    Ok(())
 }
